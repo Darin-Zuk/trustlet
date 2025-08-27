@@ -168,6 +168,12 @@ ams_neighbourhood_options = ["Oost", "ZuidOost", "Centrum", "Westerpark", "Oud-W
 # ---------- Login / Signup ----------
 if st.session_state.user is None:
     st.write('Welcome to Trustlet, the app for trusted lets.')
+
+    st.markdown(
+        "[👉 More Info](https://docs.google.com/document/d/1M4ftORvdUBx-xdMUpaCEBxdBLGTBWj7VDNk9jtv0LQg/edit?tab=t.0)",
+        unsafe_allow_html=True
+    )
+
     menu = ["Login", "Sign Up"]
     choice = st.sidebar.selectbox("Menu", menu)
 
