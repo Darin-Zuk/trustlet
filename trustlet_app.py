@@ -33,49 +33,48 @@ if "user" not in st.session_state:
 # ----------------------------------
 # Helpers
 # ----------------------------------
-def signup(name: str, email: str, password: str, inviter_email: str):
-    """
-    Invite-only signup:
-    - Verifies inviter exists and is_active
-    - Creates Auth user (fails cleanly if email already exists in Auth)
-    - Inserts users row (inactive), with invited_by set
-    - Sends a message of type 'invite_request' to inviter
-    """
-    # 1) Check inviter exists and is active
-    inviter = supabase.table("users").select("*") \
-        .eq("email", inviter_email).eq("is_active", True).execute()
-    if not inviter.data:
-        return False, "Inviter email not found or inactive."
-    inviter_id = inviter.data[0]["id"]
+def signup(name, email, password, inviter_email):
+    # 0) Validate required fields
+    if not name or not email or not password or not inviter_email:
+        return False, "All fields (Name, Email, Password, Existing User Email) are required."
 
-    # 2) Create Auth user
-    resp = supabase.auth.sign_up({"email": email, "password": password})
-    if not resp.user:
-        return False, "This email is already registered. Please log in instead."
+    try:
+        # 1) Check inviter exists and is active
+        inviter = supabase.table("users").select("*").eq("email", inviter_email).eq("is_active", True).execute()
+        if not inviter.data:
+            return False, "Inviter email not found or inactive."
 
-    auth_user_id = resp.user.get("id") if isinstance(resp.user, dict) else getattr(resp.user, "id", None)
-    if not auth_user_id:
-        return False, "Signup failed: no auth user id returned."
+        # 2) Sign up user in Supabase Auth
+        response = supabase.auth.sign_up({
+            "email": email,
+            "password": password,
+            "options": {"email_redirect_to": "https://trustlet.streamlit.app"}  
+        })
 
-    # 3) Insert/Upsert app user (inactive until approved)
-    supabase.table("users").upsert({
-        "id": auth_user_id,
-        "name": name,
-        "email": email,
-        "invited_by": inviter_id,
-        "is_active": False
-    }, on_conflict="id").execute()
+        if not response.user:
+            return False, "Signup failed: email may already exist."
 
-    # 4) Create invite request message to inviter
-    create_message(
-        sender_id=response.user.id,
-        receiver_id=inviter.data[0]["id"],
-        content=f"{name} ({email}) has requested to join Trustlet.",
-        message_type="invite_request",
-        status="pending"
-    )
+        # 3) Insert into users table with is_active=False
+        supabase.table("users").insert({
+            "id": response.user.id,
+            "name": name,
+            "email": email,
+            "invited_by": inviter.data[0]["id"],
+            "is_active": False
+        }).execute()
 
-    return True, "Signup successful! Check your inbox for an email from SupaBase Auth. You will receive another email when the nominated Existing User accepts your application."
+        # 4) Create invite request message to inviter
+        create_message(
+            sender_id=response.user.id,
+            receiver_id=inviter.data[0]["id"],
+            content=f"{name} ({email}) has requested to join Trustlet.",
+            message_type="invite_request"
+        )
+
+        return True, "Signup successful! Check your inbox for an email from SupaBase Auth. You will receive another email when the nominated Existing User accepts your application."
+
+    except Exception as e:
+        return False, f"An error occurred during signup: {str(e)}"
 
 def login(email: str, password: str):
     """
