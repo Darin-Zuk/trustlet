@@ -107,9 +107,9 @@ def send_email(to_email: str, subject: str, body: str):
             "subject": subject,
             "html": body
         }
-        st.write("📤 Email payload:", payload)  # Debug payload
+        #st.write("📤 Email payload:", payload)  # Debug payload
         result = resend.Emails.send(payload)
-        st.write("📧 Email API result:", result)
+        #st.write("📧 Email API result:", result)
     except Exception as e:
         st.error(f"Email failed: {e}")
         st.text(traceback.format_exc())
