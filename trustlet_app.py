@@ -156,7 +156,7 @@ def create_message(sender_id, receiver_id, content,
         send_email(
         #send_email_debug(
             to_email=recipient.data[0]["email"],
-            subject=f"New Trustlet {message_type} message",
+            subject=f"New message in Trustlet inbox",
             body=f"<p>You have a new message:</p><p>{safe_content}</p>"
         )
 
