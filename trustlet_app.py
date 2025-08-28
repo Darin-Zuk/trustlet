@@ -123,32 +123,44 @@ def send_email(to_email: str, subject: str, body: str):
         st.error(f"Email failed: {e}")
         st.text(traceback.format_exc())
 
+APP_URL = "https://trustlet.streamlit.app"
+
 def build_email(message_type, context=None, content=""):
     if message_type == "invite_request":
         return (
             "New membership request on Trustlet",
             f"<p>{content}</p>"
+            f"<p>To view or respond, please visit your "
+            f"<a href='{APP_URL}'>Trustlet inbox</a>.</p>"
         )
     elif message_type == "inquiry":
         return (
             f"New inquiry about '{context.get('listing_title', 'your listing')}'",
             f"<p>{content}</p>"
+            f"<p>To reply or view details, go to your "
+            f"<a href='{APP_URL}'>Trustlet inbox</a>.</p>"
         )
     elif message_type == "reply":
         return (
             "You received a reply on Trustlet",
             f"<p>{content}</p>"
+            f"<p>To reply or view the full conversation, go to your "
+            f"<a href='{APP_URL}'>Trustlet inbox</a>.</p>"
         )
     elif message_type == "system":
         return (
             "Trustlet notification",
             f"<p>{content}</p>"
+            f"<p>You can view this update in your "
+            f"<a href='{APP_URL}'>Trustlet inbox</a>.</p>"
         )
     else:
         return (
             "New message in Trustlet inbox",
             f"<p>{content}</p>"
+            f"<p>Check your <a href='{APP_URL}'>Trustlet inbox</a> for details.</p>"
         )
+
 
 
 def create_message(sender_id, receiver_id, content,
