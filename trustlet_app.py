@@ -323,7 +323,7 @@ else:
             # show listings that start before the desired_end
             query = query.lte("start_date", desired_end.isoformat())
 
-        listings = query.order("start_date", desc=True).execute()
+        listings = query.order("start_date", desc=False).execute()
 
         # ---- Results ----
         if not listings.data:
