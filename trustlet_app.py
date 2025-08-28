@@ -254,12 +254,32 @@ if st.session_state.user is None:
         email = st.text_input("Email")
         password = st.text_input("Password", type="password")
         if st.button("Login"):
-            user = login(email, password)
-            if user:
-                st.session_state.user = user
-                st.rerun()
+            if not email or not password:
+                st.error("⚠️ Please enter both email and password.")
             else:
-                st.error("Login failed or account inactive")
+                try:
+                    response = supabase.auth.sign_in_with_password({
+                        "email": email,
+                        "password": password
+                    })
+
+                    if not response.user:
+                        st.error("❌ Invalid email or password.")
+                    else:
+                        auth_user_id = response.user.get("id") if isinstance(response.user, dict) else getattr(response.user, "id", None)
+                        if not auth_user_id:
+                            st.error("❌ Could not retrieve user ID.")
+                        else:
+                            user_row = supabase.table("users").select("*").eq("id", auth_user_id).execute()
+                            if not user_row.data:
+                                st.error("❌ User not found in Trustlet database.")
+                            elif not user_row.data[0].get("is_active"):
+                                st.warning("⏳ Your account exists but has not yet been activated by an inviter.")
+                            else:
+                                st.session_state.user = user_row.data[0]
+                                st.success("✅ Logged in successfully!")
+                except Exception as e:
+                    st.error(f"An unexpected error occurred: {str(e)}")
 
 # ---------- Logged-in UI ----------
 else:
