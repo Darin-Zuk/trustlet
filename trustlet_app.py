@@ -34,47 +34,54 @@ if "user" not in st.session_state:
 # Helpers
 # ----------------------------------
 def signup(name, email, password, inviter_email):
-    # 0) Validate required fields
     if not name or not email or not password or not inviter_email:
         return False, "All fields (Name, Email, Password, Existing User Email) are required."
 
     try:
-        # 1) Check inviter exists and is active
         inviter = supabase.table("users").select("*").eq("email", inviter_email).eq("is_active", True).execute()
         if not inviter.data:
             return False, "Inviter email not found or inactive."
 
-        # 2) Sign up user in Supabase Auth
         response = supabase.auth.sign_up({
             "email": email,
             "password": password,
             "options": {"email_redirect_to": "https://trustlet.streamlit.app"}  
         })
 
-        if not response.user:
-            return False, "Signup failed: email may already exist."
+        # Normalize user ID (same as login)
+        auth_user_id = response.user.get("id") if isinstance(response.user, dict) else getattr(response.user, "id", None)
+        if not auth_user_id:
+            return False, "Signup failed: could not retrieve user ID (account may already exist)."
 
-        # 3) Insert into users table with is_active=False
+        # Check for duplicate email error
+        if hasattr(response, "error") and response.error:
+            if "already registered" in str(response.error).lower():
+                return False, "This email is already registered. Please log in instead."
+            return False, f"Signup failed: {response.error}"
+
+        # Insert into users
         supabase.table("users").insert({
-            "id": response.user.id,
+            "id": auth_user_id,
             "name": name,
             "email": email,
             "invited_by": inviter.data[0]["id"],
             "is_active": False
         }).execute()
 
-        # 4) Create invite request message to inviter
+        # Create invite request message
         create_message(
-            sender_id=response.user.id,
+            sender_id=auth_user_id,
             receiver_id=inviter.data[0]["id"],
             content=f"{name} ({email}) has requested to join Trustlet.",
-            message_type="invite_request"
+            message_type="invite_request",
+            status="pending"   # <-- FIX
         )
 
         return True, "Signup successful! Check your inbox for an email from SupaBase Auth. You will receive another email when the nominated Existing User accepts your application."
 
     except Exception as e:
         return False, f"An error occurred during signup: {str(e)}"
+
 
 def login(email: str, password: str):
     """
@@ -128,36 +135,42 @@ def send_email_debug(to_email, subject, body):
     st.write("Raw API response:", resp.status_code, resp.text)
 
 def create_message(sender_id, receiver_id, content,
-                   message_type="normal", listing_id=None,
+                   message_type="uncategorized",  # was "normal"
+                   listing_id=None,
                    status="sent", parent_message_id=None):
+    try:
     # Build message dict
-    msg = {
-        "sender_id": sender_id,
-        "receiver_id": receiver_id,
-        "content": content,
-        "message_type": message_type,
-        "status": status,
-        "is_active": True
-    }
-    if listing_id:
-        msg["listing_id"] = listing_id
-    if parent_message_id:
-        msg["parent_message_id"] = parent_message_id  # ✅ include here
+        msg = {
+            "sender_id": sender_id,
+            "receiver_id": receiver_id,
+            "content": content,
+            "message_type": message_type,
+            "status": status,
+            "is_active": True
+        }
+        if listing_id:
+            msg["listing_id"] = listing_id
+        if parent_message_id:
+            msg["parent_message_id"] = parent_message_id  # ✅ include here
 
-    # Insert into DB
-    supabase.table("messages").insert(msg).execute()
+        # Insert into DB
+        supabase.table("messages").insert(msg).execute()
 
-    # Send email to recipient (only if found)
-    recipient = supabase.table("users").select("email").eq("id", receiver_id).execute()
-    if recipient.data:
-        import html
-        safe_content = html.escape(content).replace("\n", "<br>")
-        send_email(
-        #send_email_debug(
-            to_email=recipient.data[0]["email"],
-            subject=f"New message in Trustlet inbox",
-            body=f"<p>You have a new message:</p><p>{safe_content}</p>"
-        )
+        # Send email to recipient (only if found)
+        recipient = supabase.table("users").select("email").eq("id", receiver_id).execute()
+        if recipient.data:
+            import html
+            safe_content = html.escape(content).replace("\n", "<br>")
+            send_email(
+            #send_email_debug(
+                to_email=recipient.data[0]["email"],
+                subject=f"New message in Trustlet inbox",
+                body=f"<p>You have a new message:</p><p>{safe_content}</p>"
+            )
+    except Exception as e:
+            st.error(f"Failed to create message: {e}")
+            st.text(traceback.format_exc())
+
 
 ams_neighbourhood_options = ["Oost", "ZuidOost", "Centrum", "Westerpark", "Oud-West", "Oud-Zuid", "Noord"]
 # ----------------------------------
@@ -184,7 +197,8 @@ if st.session_state.user is None:
         password = st.text_input("Password", type="password")
         inviter_email = st.text_input("Existing User Email")
         if st.button("Sign Up"):
-            success, msg = signup(name, email, password, inviter_email)
+            with st.spinner("⏳ Signing you up... please wait"):
+                success, msg = signup(name, email, password, inviter_email)
             if success:
                 st.success(msg)
             else:
@@ -301,7 +315,7 @@ else:
                             receiver_id=listing['user_id'],
                             listing_id=listing['id'],
                             content=f"Inquiry about '{listing['title']}'\n\n{message_text}",
-                            message_type="normal"
+                            message_type="inquiry"
                         )
                         st.success("Message sent!")
 
