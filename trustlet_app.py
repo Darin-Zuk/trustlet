@@ -111,7 +111,7 @@ def login(email: str, password: str):
 def send_email(to_email: str, subject: str, body: str):
     try:
         payload = {
-            "from": st.secrets["resend"]["from_email"],
+            "from": f"Trustlet Team <{st.secrets['resend']['from_email']}>",
             "to": [to_email],
             "subject": subject,
             "html": body
@@ -122,20 +122,6 @@ def send_email(to_email: str, subject: str, body: str):
     except Exception as e:
         st.error(f"Email failed: {e}")
         st.text(traceback.format_exc())
-
-def send_email_debug(to_email, subject, body):
-    payload = {
-        "from": st.secrets["resend"]["from_email"],
-        "to": [to_email],
-        "subject": subject,
-        "html": body
-    }
-    headers = {
-        "Authorization": f"Bearer {st.secrets['resend']['api_key']}",
-        "Content-Type": "application/json"
-    }
-    resp = requests.post("https://api.resend.com/emails", json=payload, headers=headers)
-    st.write("Raw API response:", resp.status_code, resp.text)
 
 def build_email(message_type, context=None, content=""):
     if message_type == "invite_request":
