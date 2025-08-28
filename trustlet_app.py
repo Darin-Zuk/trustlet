@@ -109,7 +109,7 @@ def send_email(to_email: str, subject: str, body: str):
     try:
         payload = {
             "from": st.secrets["resend"]["from_email"],
-            "to": to_email,
+            "to": [to_email],
             "subject": subject,
             "html": body
         }
@@ -186,7 +186,7 @@ if st.session_state.user is None:
         unsafe_allow_html=True
     )
 
-    menu = ["Login", "Sign Up"]
+    menu = ["Sign Up","Login"]
     choice = st.sidebar.selectbox("Menu", menu)
 
     if choice == "Sign Up":
