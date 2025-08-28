@@ -6,6 +6,7 @@ import resend
 import traceback
 import html
 import requests
+import streamlit.components.v1 as components
 # ----------------------------------
 # Page setup
 # ----------------------------------
@@ -45,7 +46,9 @@ def signup(name, email, password, inviter_email):
         response = supabase.auth.sign_up({
             "email": email,
             "password": password,
-            "options": {"email_redirect_to": "https://trustlet.streamlit.app"}  
+            "options": {
+                "email_redirect_to": "https://trustlet.streamlit.app/?auth=confirmed"
+            }
         })
 
         # Normalize user ID (same as login)
@@ -72,9 +75,9 @@ def signup(name, email, password, inviter_email):
         create_message(
             sender_id=auth_user_id,
             receiver_id=inviter.data[0]["id"],
-            content=f"{name} ({email}) has requested to join Trustlet.",
+            content=f"{name} ({email}) has requested to join Trustlet. Check your inbox in the app to approve.",
             message_type="invite_request",
-            status="pending"   # <-- FIX
+            status="pending"   # <-- FIXi dont 
         )
 
         return True, "Signup successful! Check your inbox for an email from SupaBase Auth. You will receive another email when the nominated Existing User accepts your application."
@@ -134,12 +137,42 @@ def send_email_debug(to_email, subject, body):
     resp = requests.post("https://api.resend.com/emails", json=payload, headers=headers)
     st.write("Raw API response:", resp.status_code, resp.text)
 
+def build_email(message_type, context=None, content=""):
+    if message_type == "invite_request":
+        return (
+            "New membership request on Trustlet",
+            f"<p>{content}</p>"
+        )
+    elif message_type == "inquiry":
+        return (
+            f"New inquiry about '{context.get('listing_title', 'your listing')}'",
+            f"<p>{content}</p>"
+        )
+    elif message_type == "reply":
+        return (
+            "You received a reply on Trustlet",
+            f"<p>{content}</p>"
+        )
+    elif message_type == "system":
+        return (
+            "Trustlet notification",
+            f"<p>{content}</p>"
+        )
+    else:
+        return (
+            "New message in Trustlet inbox",
+            f"<p>{content}</p>"
+        )
+
+
 def create_message(sender_id, receiver_id, content,
-                   message_type="uncategorized",  # was "normal"
+                   message_type="uncategorized",
                    listing_id=None,
-                   status="sent", parent_message_id=None):
+                   status="sent",
+                   parent_message_id=None,
+                   email_subject=None,
+                   email_body=None):
     try:
-    # Build message dict
         msg = {
             "sender_id": sender_id,
             "receiver_id": receiver_id,
@@ -151,25 +184,37 @@ def create_message(sender_id, receiver_id, content,
         if listing_id:
             msg["listing_id"] = listing_id
         if parent_message_id:
-            msg["parent_message_id"] = parent_message_id  # ✅ include here
+            msg["parent_message_id"] = parent_message_id
 
         # Insert into DB
         supabase.table("messages").insert(msg).execute()
 
-        # Send email to recipient (only if found)
+        # Send email to recipient
         recipient = supabase.table("users").select("email").eq("id", receiver_id).execute()
         if recipient.data:
-            import html
             safe_content = html.escape(content).replace("\n", "<br>")
+
+            if email_subject and email_body:
+                # Explicit override
+                subject, body = email_subject, email_body
+            else:
+                # Use helper to generate subject/body from message_type + context
+                context = {}
+                if listing_id:
+                    lst = supabase.table("listings").select("title").eq("id", listing_id).execute()
+                    if lst.data:
+                        context["listing_title"] = lst.data[0]["title"]
+
+                subject, body = build_email(message_type, context, safe_content)
+
             send_email(
-            #send_email_debug(
                 to_email=recipient.data[0]["email"],
-                subject=f"New message in Trustlet inbox",
-                body=f"<p>You have a new message:</p><p>{safe_content}</p>"
+                subject=subject,
+                body=body
             )
     except Exception as e:
-            st.error(f"Failed to create message: {e}")
-            st.text(traceback.format_exc())
+        st.error(f"Failed to create message: {e}")
+        st.text(traceback.format_exc())
 
 
 ams_neighbourhood_options = ["Oost", "ZuidOost", "Centrum", "Westerpark", "Oud-West", "Oud-Zuid", "Noord"]
@@ -421,7 +466,14 @@ else:
                             receiver_id=msg["sender_id"],
                             content="✅ Your membership request has been approved. Welcome to Trustlet!",
                             message_type="system",
-                            status="sent"
+                            status="sent",
+                            email_subject="🎉 Welcome to Trustlet – Your membership has been approved!",
+                            email_body=f"""
+                                <p>Hi there,</p>
+                                <p>Good news – your membership request has been <strong>approved</strong> 🎉</p>
+                                <p>You can now <a href="https://trustlet.streamlit.app">log in to Trustlet</a>.</p>
+                                <p>The Trustlet Team</p>
+                            """
                         )
                         st.success(f"Approved {sender_email}")
                         st.rerun()
