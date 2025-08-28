@@ -278,8 +278,9 @@ if st.session_state.user is None:
                             else:
                                 st.session_state.user = user_row.data[0]
                                 st.success("✅ Logged in successfully!")
+                                st.experimental_rerun()
                 except Exception as e:
-                    st.error(f"An unexpected error occurred: {str(e)}")
+                    st.error(f"Error: {str(e)}")
 
 # ---------- Logged-in UI ----------
 else:
