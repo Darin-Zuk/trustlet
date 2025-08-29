@@ -31,6 +31,9 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 if "user" not in st.session_state:
     st.session_state.user = None
 
+
+APP_URL = "https://trustlet.streamlit.app"
+BETA_MAX_USERS = 50
 # ----------------------------------
 # Helpers
 # ----------------------------------
@@ -123,7 +126,7 @@ def send_email(to_email: str, subject: str, body: str):
         st.error(f"Email failed: {e}")
         st.text(traceback.format_exc())
 
-APP_URL = "https://trustlet.streamlit.app"
+
 
 def build_email(message_type, context=None, content=""):
     if message_type == "invite_request":
@@ -134,19 +137,41 @@ def build_email(message_type, context=None, content=""):
             f"<a href='{APP_URL}'>Trustlet inbox</a>.</p>"
         )
     elif message_type == "inquiry":
+        sender_name = context.get("sender_name", "A Trustlet member")
+        listing_title = context.get("listing_title", "your listing")
+
         return (
-            f"New inquiry about '{context.get('listing_title', 'your listing')}'",
-            f"<p>{content}</p>"
-            f"<p>To reply or view details, go to your "
-            f"<a href='{APP_URL}'>Trustlet inbox</a>.</p>"
+            f"New inquiry about your listing '{listing_title}'",
+            f"""
+            <h3>📩 New Inquiry</h3>
+            <p><strong>From:</strong> {sender_name}</p>
+            
+            <p><em>{content}</em></p>
+
+            <hr>
+            <p>To reply or view details, go to your 
+            <a href="{APP_URL}">Trustlet inbox</a>.</p>
+            """
         )
+
     elif message_type == "reply":
+        sender_name = context.get("sender_name", "A Trustlet member")
+
         return (
             "You received a reply on Trustlet",
-            f"<p>{content}</p>"
-            f"<p>To reply or view the full conversation, go to your "
-            f"<a href='{APP_URL}'>Trustlet inbox</a>.</p>"
+            f"""
+            <h3>💬 New Reply</h3>
+            <p><strong>From:</strong> {sender_name}</p>
+
+            <p><em>{content}</em></p>
+
+
+            <hr>
+            <p>To reply or view the full conversation, go to your 
+            <a href="{APP_URL}">Trustlet inbox</a>.</p>
+            """
         )
+        
     elif message_type == "system":
         return (
             "Trustlet notification",
@@ -163,56 +188,90 @@ def build_email(message_type, context=None, content=""):
 
 
 
-def create_message(sender_id, receiver_id, content,
-                   message_type="uncategorized",
-                   listing_id=None,
-                   status="sent",
-                   parent_message_id=None,
-                   email_subject=None,
-                   email_body=None):
+
+
+def create_message(
+    sender_id,
+    receiver_id,
+    content,
+    message_type="uncategorized",
+    status="sent",
+    context=None,
+    email_subject=None,
+    email_body=None,
+    listing_id=None
+):
+    """
+    Create a message in the database and send an email notification.
+
+    - Inserts the message into `messages`
+    - Builds email subject/body via build_email
+
+    """
+    if context is None:
+        context = {}
+
     try:
-        msg = {
-            "sender_id": sender_id,
-            "receiver_id": receiver_id,
-            "content": content,
-            "message_type": message_type,
-            "status": status,
-            "is_active": True
-        }
-        if listing_id:
-            msg["listing_id"] = listing_id
-        if parent_message_id:
-            msg["parent_message_id"] = parent_message_id
-
-        # Insert into DB
-        supabase.table("messages").insert(msg).execute()
-
-        # Send email to recipient
-        recipient = supabase.table("users").select("email").eq("id", receiver_id).execute()
-        if recipient.data:
-            safe_content = html.escape(content).replace("\n", "<br>")
-
-            if email_subject and email_body:
-                # Explicit override
-                subject, body = email_subject, email_body
-            else:
-                # Use helper to generate subject/body from message_type + context
-                context = {}
-                if listing_id:
-                    lst = supabase.table("listings").select("title").eq("id", listing_id).execute()
-                    if lst.data:
-                        context["listing_title"] = lst.data[0]["title"]
-
-                subject, body = build_email(message_type, context, safe_content)
-
-            send_email(
-                to_email=recipient.data[0]["email"],
-                subject=subject,
-                body=body
+        # Insert into database
+        msg = (
+            supabase.table("messages")
+            .insert(
+                {
+                    "sender_id": sender_id,
+                    "receiver_id": receiver_id,
+                    "content": content,
+                    "message_type": message_type,
+                    "status": status,
+                    "listing_id": listing_id,
+                }
             )
+            .execute()
+        )
+        if not msg.data:
+            st.error("❌ Failed to create message in database.")
+            return None
+
+        # Lookup receiver email
+        receiver = (
+            supabase.table("users")
+            .select("email, name")
+            .eq("id", receiver_id)
+            .execute()
+        )
+        if not receiver.data:
+            st.warning("⚠️ Receiver not found in users table.")
+            return msg.data[0]
+
+        to_email = receiver.data[0]["email"]
+
+
+
+        # Always include sender name in context
+        sender = (
+            supabase.table("users")
+            .select("name")
+            .eq("id", sender_id)
+            .execute()
+        )
+        if sender.data:
+            context["sender_name"] = sender.data[0]["name"]
+
+        # Build email subject + body
+        subject, body = build_email(message_type, context, content)
+
+        # Allow overrides
+        subject = email_subject or subject
+        body = email_body or body
+
+        # Send email
+        send_email(to_email, subject, body)
+
+        return msg.data[0]
+
     except Exception as e:
-        st.error(f"Failed to create message: {e}")
-        st.text(traceback.format_exc())
+        st.error(f"❌ Error creating message: {str(e)}")
+        return None
+
 
 
 ams_neighbourhood_options = ["Oost", "ZuidOost", "Centrum", "Westerpark", "Oud-West", "Oud-Zuid", "Noord"]
@@ -235,17 +294,30 @@ if st.session_state.user is None:
     if choice == "Sign Up":
         st.subheader("Create an account")
         st.write('Requires an existing user to accept your application')
+
+        # Compute whether the beta is full
+        beta_resp = supabase.table("users").select("id", count="exact").execute()
+        beta_count = getattr(beta_resp, "count", None)
+        if beta_count is None:
+            beta_count = len(beta_resp.data or [])
+        is_full = beta_count >= BETA_MAX_USERS
+
         name = st.text_input("Name")
         email = st.text_input("Email")
         password = st.text_input("Password", type="password")
         inviter_email = st.text_input("Existing User Email")
-        if st.button("Sign Up"):
+
+        if is_full:
+            st.warning(f"🚧 Beta limit reached ({beta_count}/{BETA_MAX_USERS}). Sign-ups are temporarily closed.")
+        # Disable the button if full
+        if st.button("Sign Up", disabled=is_full):
             with st.spinner("⏳ Signing you up... please wait"):
                 success, msg = signup(name, email, password, inviter_email)
             if success:
                 st.success(msg)
             else:
                 st.error(msg)
+
 
     elif choice == "Login":
         st.subheader("Login")
@@ -356,7 +428,19 @@ else:
 
                 st.write(f"🏠 {listing.get('home_type','')} — {listing.get('bedrooms', 1)} bedroom(s)")
                 st.write(f"Location: {listing.get('street_name','')}, {listing['location']}")
-                st.write(f"Cost: €{listing['cost']}")
+
+
+                # Parse dates (assuming they are in "YYYY-MM-DD" format)
+                start = datetime.strptime(listing["start_date"], "%Y-%m-%d").date()
+                end = datetime.strptime(listing["end_date"], "%Y-%m-%d").date()
+
+                nights = (end - start).days
+                total_cost = listing["cost"]
+                per_night = total_cost / nights if nights > 0 else total_cost
+
+                st.write(f"Cost: €{total_cost} (€{per_night:.2f} per night)")
+
+
                 st.write(f"Available: {listing['start_date']} → {listing['end_date']}")
                 if listing.get("photo_link"):
                     st.write(f"Photos: {listing['photo_link']}")
@@ -454,7 +538,7 @@ else:
         # Only fetch active messages; handled invite requests will be hidden by status != 'pending'
         inbox = supabase.table("messages").select("*") \
             .eq("receiver_id", user['id']).eq("is_active", True) \
-            .order("sent_at", desc=True).execute()
+            .order("created_at", desc=True).execute()
 
         for msg in inbox.data or []:
             # Sender info
@@ -535,7 +619,6 @@ else:
                             listing_id=msg.get("listing_id"),
                             content=reply_text,
                             message_type="reply",
-                            parent_message_id=msg["id"]
                         )
                         st.success("Reply sent")
                         st.rerun()
