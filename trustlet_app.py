@@ -47,7 +47,7 @@ def signup(name, email, password, inviter_email):
             "email": email,
             "password": password,
             "options": {
-                "email_redirect_to": "https://trustlet.streamlit.app/?auth=confirmed"
+                "email_redirect_to": "https://trustlet-verify.streamlit.app"
             }
         })
 
