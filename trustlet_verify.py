@@ -18,7 +18,7 @@ st.markdown(
 st.info(
     "🆕 **If you just signed up as a new user:**\n\n"
     "- Please wait for an existing Trustlet member to approve your application.\n"
-    "- You will receive another email once your membership is approved.\n"
+    "- You will receive another email once your membership is approved (it might go to your SPAM folder).\n"
 )
 
 st.success(
