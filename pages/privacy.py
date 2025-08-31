@@ -1,8 +1,10 @@
 import streamlit as st
 
-st.set_page_config(page_title="Privacy Policy")
+st.set_page_config(page_title="Privacy")
+st.title("Privacy")
 
-st.title("Privacy Policy")
+st.markdown("## Privacy Policy")
+
 st.markdown("Last updated: September 2025")
 
 st.markdown("""

@@ -1,8 +1,9 @@
 import streamlit as st
 
-st.set_page_config(page_title="Terms & Conditions")
+st.set_page_config(page_title="Terms")  # <- important for slug
+st.title("Terms")                       # <- must be a single word if you want /Terms
 
-st.title("Terms & Conditions")
+
 st.markdown("Last updated: September 2025")
 
 st.markdown("""
