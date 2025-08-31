@@ -18,25 +18,22 @@ st.set_page_config(page_title="Trustlet", layout="wide")
 
 
 # Hide Streamlit footer and "Fork/GitHub" badge
-hide_streamlit_style = """
+hide_streamlit_mobile = """
     <style>
-    /* Hide Streamlit hamburger menu */
-    #MainMenu {visibility: hidden;}
+    /* Hide Streamlit mobile footer/banner and GitHub links */
+    #MainMenu {visibility: hidden;}  /* Hide hamburger menu */
+    footer {visibility: hidden;}     /* Hide classic footer */
 
-    /* Hide the classic footer */
-    footer {visibility: hidden;}
-
-    /* Hide bottom toolbar / credits */
-    div[class*="stToolbar"] {visibility: hidden !important;}
-    div[class*="stDecoration"] {visibility: hidden !important;}
-    div[class*="viewerBadge"] {visibility: hidden !important;}
-
-    /* Extra catch-all: hide any link pointing to Streamlit or GitHub */
+    /* Catch all Streamlit/GitHub links (desktop + mobile) */
     a[href*="streamlit.io"] {display: none !important;}
     a[href*="github.com"] {display: none !important;}
+
+    /* Remove their container bars too */
+    div:has(> a[href*="streamlit.io"]) {display: none !important;}
+    div:has(> a[href*="github.com"]) {display: none !important;}
     </style>
 """
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+st.markdown(hide_streamlit_mobile, unsafe_allow_html=True)
 
 # ----------------------------------
 # Supabase setup
