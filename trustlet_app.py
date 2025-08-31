@@ -26,13 +26,14 @@ hide_streamlit_style = """
     /* Hide the classic footer */
     footer {visibility: hidden;}
 
-    /* Hide bottom toolbar / credits */
+    /* Hide bottom toolbar / credits (works for Fork) */
     div[class*="stToolbar"] {visibility: hidden !important;}
     div[class*="stDecoration"] {visibility: hidden !important;}
     div[class*="viewerBadge"] {visibility: hidden !important;}
 
-    /* Extra catch-all: hide any link pointing to Streamlit or GitHub */
+    /* Hide any bottom links pointing to Streamlit/GitHub */
     a[href*="streamlit.io"] {display: none !important;}
+    a[href*="share.streamlit.io"] {display: none !important;}
     a[href*="github.com"] {display: none !important;}
     </style>
 """
