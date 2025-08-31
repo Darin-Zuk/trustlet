@@ -8,12 +8,19 @@ import html
 import requests
 import streamlit.components.v1 as components
 
-#Hide links to GitHub
-# Hide Streamlit footer and menu
+# Hide Streamlit default footer + GitHub/Fork links
 hide_streamlit_style = """
     <style>
+    /* Hide Streamlit default main menu */
     #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
+
+    /* Hide Streamlit footer ("Made with Streamlit") */
+    footer {visibility: hidden !important;}
+    footer:after {content:'' !important;}
+
+    /* Hide "View source" / "GitHub" buttons injected at bottom */
+    div.viewerBadge_link__1S137 {display: none !important;}
+    div.viewerBadge_container__1QSob {display: none !important;}
     </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
