@@ -17,23 +17,29 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="Trustlet", layout="wide")
 
 
-# Hide Streamlit footer and "Fork/GitHub" badge
-hide_streamlit_mobile = """
+hide_streamlit_style = """
     <style>
-    /* Hide Streamlit mobile footer/banner and GitHub links */
-    #MainMenu {visibility: hidden;}  /* Hide hamburger menu */
-    footer {visibility: hidden;}     /* Hide classic footer */
+    /* Hide Streamlit hamburger menu + default footer */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    footer:after {content:'';}
 
-    /* Catch all Streamlit/GitHub links (desktop + mobile) */
+    /* Hide Fork/GitHub badge */
+    div.viewerBadge_link__1S137 {display: none !important;}
+    div.viewerBadge_container__1QSob {display: none !important;}
+
+    /* Hide any links to Streamlit or GitHub */
     a[href*="streamlit.io"] {display: none !important;}
+    a[href*="share.streamlit.io"] {display: none !important;}
     a[href*="github.com"] {display: none !important;}
 
-    /* Remove their container bars too */
+    /* Hide containers that hold only those links */
     div:has(> a[href*="streamlit.io"]) {display: none !important;}
+    div:has(> a[href*="share.streamlit.io"]) {display: none !important;}
     div:has(> a[href*="github.com"]) {display: none !important;}
     </style>
 """
-st.markdown(hide_streamlit_mobile, unsafe_allow_html=True)
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # ----------------------------------
 # Supabase setup
