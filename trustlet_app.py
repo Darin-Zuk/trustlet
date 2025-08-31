@@ -284,7 +284,7 @@ if st.session_state.user is None:
     st.write('Welcome to Trustlet, the app for trusted lets.')
 
     st.markdown(
-        "[👉 More Info](https://docs.google.com/document/d/1M4ftORvdUBx-xdMUpaCEBxdBLGTBWj7VDNk9jtv0LQg/edit?tab=t.0)",
+        "[👉 What is Trustlet?](https://docs.google.com/document/d/1M4ftORvdUBx-xdMUpaCEBxdBLGTBWj7VDNk9jtv0LQg/edit?tab=t.0)",
         unsafe_allow_html=True
     )
 
@@ -410,9 +410,13 @@ else:
         listings = query.order("start_date", desc=False).execute()
 
         # ---- Results ----
-        if not listings.data:
+        count = len(listings.data or [])
+
+        if count == 0:
             st.info("No listings match your filters.")
         else:
+            st.success(f"{count} listing{'s' if count > 1 else ''} available")
+
             for listing in listings.data or []:
                 # Fetch lister info
                 lister = supabase.table("users").select("name, created_at, invited_by").eq("id", listing["user_id"]).execute()
@@ -441,7 +445,11 @@ else:
                 st.write(f"Cost: €{total_cost} (€{per_night:.2f} per night)")
 
 
-                st.write(f"Available: {listing['start_date']} → {listing['end_date']}")
+                #date format to dd/mm for listings
+                start_fmt = datetime.strptime(listing['start_date'], "%Y-%m-%d").strftime("%d/%m/%y")
+                end_fmt = datetime.strptime(listing['end_date'], "%Y-%m-%d").strftime("%d/%m/%y")
+
+                st.write(f"Available: {start_fmt} → {end_fmt}")
                 if listing.get("photo_link"):
                     st.write(f"Photos: {listing['photo_link']}")
 
@@ -629,3 +637,6 @@ else:
                         st.rerun()
 
             st.markdown("---")
+
+#st.markdown("---")
+st.caption("💬 For any issues, email admin@amstrustlet.app")
