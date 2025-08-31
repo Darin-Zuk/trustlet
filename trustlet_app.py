@@ -20,18 +20,16 @@ st.set_page_config(page_title="Trustlet", layout="wide")
 # Hide Streamlit footer and "Fork/GitHub" badge
 hide_streamlit_style = """
     <style>
-    /* Hide hamburger menu */
+    /* Hide Streamlit hamburger menu */
     #MainMenu {visibility: hidden;}
-    
+
     /* Hide classic footer */
     footer {visibility: hidden;}
-    footer:after {content:'';}
-    
-    /* Hide bottom toolbar (Made with Streamlit + GitHub links) */
-    .st-emotion-cache-12fmjuu {display: none !important;}
-    .st-emotion-cache-1wbqy5l {display: none !important;}
-    [class*="st-emotion-cache"] a[href*="streamlit.io"] {display: none !important;}
-    [class*="st-emotion-cache"] a[href*="github.com"] {display: none !important;}
+
+    /* Hide Streamlit bottom toolbar (Made with Streamlit / GitHub links) */
+    div[data-testid="stStatusWidget"] {visibility: hidden;}
+    div[data-testid="stDecoration"] {visibility: hidden;}
+    div[data-testid="stToolbar"] {visibility: hidden;}
     </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
