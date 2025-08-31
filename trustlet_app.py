@@ -20,26 +20,17 @@ st.set_page_config(page_title="Trustlet", layout="wide")
 # Hide Streamlit footer and "Fork/GitHub" badge
 hide_streamlit_style = """
     <style>
-    /* Hide Streamlit hamburger menu */
+    /* What already worked */
     #MainMenu {visibility: hidden;}
-
-    /* Hide the classic footer */
     footer {visibility: hidden;}
-
-    /* Hide bottom toolbar / credits (Fork etc.) */
     div[class*="stToolbar"] {visibility: hidden !important;}
     div[class*="stDecoration"] {visibility: hidden !important;}
     div[class*="viewerBadge"] {visibility: hidden !important;}
 
-    /* Hide any Streamlit/GitHub links */
-    a[href*="streamlit.io"] {display: none !important;}
-    a[href*="share.streamlit.io"] {display: none !important;}
-    a[href*="github.com"] {display: none !important;}
-
-    /* Hide entire containers that include those links */
-    div:has(a[href*="streamlit.io"]) {display: none !important;}
-    div:has(a[href*="share.streamlit.io"]) {display: none !important;}
-    div:has(a[href*="github.com"]) {display: none !important;}
+    /* Brute force: hide any fixed bottom bars */
+    div[style*="position: fixed"][style*="bottom: 0"] {
+        display: none !important;
+    }
     </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
