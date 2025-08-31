@@ -7,6 +7,18 @@ import traceback
 import html
 import requests
 import streamlit.components.v1 as components
+
+#Hide links to GitHub
+# Hide Streamlit footer and menu
+hide_streamlit_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    </style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+
 # ----------------------------------
 # Page setup
 # ----------------------------------
