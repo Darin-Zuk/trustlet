@@ -663,4 +663,15 @@ else:
             st.markdown("---")
 
 #st.markdown("---")
-st.caption("💬 For any issues, email admin@amstrustlet.app")
+st.markdown("---")
+
+st.markdown(
+    "<p style='text-align:left; color:#555; font-size:0.9em;'>"
+    "💬 For any issues, email <a href='mailto:admin@amstrustlet.app'>admin@amstrustlet.app</a><br>"
+    "⚠️ Trustlet is in beta. By using this service you agree to our "
+    "<a href='/Terms' target='_self'>Terms & Conditions</a> and "
+    "<a href='/Privacy' target='_self'>Privacy Policy</a>.<br>"
+    "</p>",
+    unsafe_allow_html=True
+)
+
