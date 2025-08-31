@@ -157,8 +157,8 @@ def build_email(message_type, context=None, content=""):
         return (
             "New membership request on Trustlet",
             f"<p>{content}</p>"
-            f"<p>To view or respond, please visit your "
-            f"<a href='{APP_URL}'>Trustlet inbox</a>.</p>"
+            f"<p>Log into "
+            f"<a href='{APP_URL}'>Trustlet</a> and select <b>Messages</b> from the dropdown menu.</p>"
         )
     elif message_type == "inquiry":
         sender_name = context.get("sender_name", "A Trustlet member")
