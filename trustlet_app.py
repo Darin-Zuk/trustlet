@@ -18,22 +18,23 @@ st.set_page_config(page_title="Trustlet", layout="wide")
 
 
 # Hide Streamlit footer and "Fork/GitHub" badge
-hide_streamlit_style = """
+hide_streamlit_badge = """
     <style>
-    /* What already worked */
+    /* Hide Streamlit hamburger menu + footer */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    div[class*="stToolbar"] {visibility: hidden !important;}
-    div[class*="stDecoration"] {visibility: hidden !important;}
-    div[class*="viewerBadge"] {visibility: hidden !important;}
 
-    /* Brute force: hide any fixed bottom bars */
-    div[style*="position: fixed"][style*="bottom: 0"] {
-        display: none !important;
-    }
+    /* Hide Fork/GitHub badges */
+    div[class*="viewerBadge"] {display: none !important;}
+    div[class*="stToolbar"] {display: none !important;}
+    div[class*="stDecoration"] {display: none !important;}
+
+    /* 🚨 Kill the Streamlit mobile hosting badge (iframe at bottom) */
+    iframe[title="streamlit-badge"] {display: none !important;}
+    iframe[src*="streamlit"] {display: none !important;}
     </style>
 """
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+st.markdown(hide_streamlit_badge, unsafe_allow_html=True)
 
 # ----------------------------------
 # Supabase setup
