@@ -17,26 +17,23 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="Trustlet", layout="wide")
 
 
+# Hide Streamlit footer and "Fork/GitHub" badge
 hide_streamlit_style = """
     <style>
-    /* Hide Streamlit hamburger menu + default footer */
+    /* Hide Streamlit hamburger menu */
     #MainMenu {visibility: hidden;}
+
+    /* Hide the classic footer */
     footer {visibility: hidden;}
-    footer:after {content:'';}
 
-    /* Hide Fork/GitHub badge */
-    div.viewerBadge_link__1S137 {display: none !important;}
-    div.viewerBadge_container__1QSob {display: none !important;}
+    /* Hide bottom toolbar / credits */
+    div[class*="stToolbar"] {visibility: hidden !important;}
+    div[class*="stDecoration"] {visibility: hidden !important;}
+    div[class*="viewerBadge"] {visibility: hidden !important;}
 
-    /* Hide any links to Streamlit or GitHub */
+    /* Extra catch-all: hide any link pointing to Streamlit or GitHub */
     a[href*="streamlit.io"] {display: none !important;}
-    a[href*="share.streamlit.io"] {display: none !important;}
     a[href*="github.com"] {display: none !important;}
-
-    /* Hide containers that hold only those links */
-    div:has(> a[href*="streamlit.io"]) {display: none !important;}
-    div:has(> a[href*="share.streamlit.io"]) {display: none !important;}
-    div:has(> a[href*="github.com"]) {display: none !important;}
     </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
