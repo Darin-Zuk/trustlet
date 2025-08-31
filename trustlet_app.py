@@ -305,19 +305,37 @@ ams_neighbourhood_options = ["Oost", "ZuidOost", "Centrum", "Westerpark", "Oud-W
 
 # ---------- Login / Signup ----------
 if st.session_state.user is None:
-    st.write('Welcome to Trustlet, the app for trusted lets.')
+    st.subheader('Welcome to Trustlet, the app for trusted lets.')
 
     st.markdown(
         "[👉 What is Trustlet?](https://docs.google.com/document/d/1M4ftORvdUBx-xdMUpaCEBxdBLGTBWj7VDNk9jtv0LQg/edit?tab=t.0)",
         unsafe_allow_html=True
     )
 
-    menu = ["Sign Up","Login"]
-    choice = st.sidebar.selectbox("Menu", menu)
+    # Define menu
+    menu = ["Sign Up", "Login"]
+
+    # Handle switching flag before rendering selectbox
+    if st.session_state.get("switch_to_login"):
+        st.session_state.switch_to_login = False
+        default_index = menu.index("Login")
+    else:
+        default_index = menu.index("Sign Up")
+
+    # Sidebar menu with default index depending on flag
+    choice = st.sidebar.selectbox("Menu", menu, index=default_index, key="menu_choice")
 
     if choice == "Sign Up":
+        
+
+        # Inline message with login link
+        if st.button("Log in (for existing users)", key="link_button"):
+            st.session_state.switch_to_login = True
+            st.rerun()        
+
         st.subheader("Create an account")
-        st.write('Requires an existing user to accept your application')
+
+        st.write("Requires an existing user to accept your application")
 
         # Compute whether the beta is full
         beta_resp = supabase.table("users").select("id", count="exact").execute()
