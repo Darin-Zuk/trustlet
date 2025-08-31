@@ -8,28 +8,28 @@ import html
 import requests
 import streamlit.components.v1 as components
 
-# Hide Streamlit default footer + GitHub/Fork links
-hide_streamlit_style = """
-    <style>
-    /* Hide Streamlit default main menu */
-    #MainMenu {visibility: hidden;}
 
-    /* Hide Streamlit footer ("Made with Streamlit") */
-    footer {visibility: hidden !important;}
-    footer:after {content:'' !important;}
-
-    /* Hide "View source" / "GitHub" buttons injected at bottom */
-    div.viewerBadge_link__1S137 {display: none !important;}
-    div.viewerBadge_container__1QSob {display: none !important;}
-    </style>
-"""
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 
 # ----------------------------------
 # Page setup
 # ----------------------------------
 st.set_page_config(page_title="Trustlet", layout="wide")
+
+
+# Hide Streamlit footer and "Fork/GitHub" badge
+hide_streamlit_style = """
+    <style>
+    #MainMenu {visibility: hidden;}              /* Hide the hamburger menu */
+    header {visibility: hidden;}                /* Hide the top Streamlit header */
+    footer {visibility: hidden;}                /* Hide classic footer */
+    
+    /* Hide viewer badge (Fork/GitHub links) */
+    [class*="viewerBadge_container__"] {display: none !important;}
+    [class*="viewerBadge_link__"] {display: none !important;}
+    </style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # ----------------------------------
 # Supabase setup
