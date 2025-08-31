@@ -68,7 +68,7 @@ def signup(name, email, password, inviter_email):
     try:
         inviter = supabase.table("users").select("*").eq("email", inviter_email).eq("is_active", True).execute()
         if not inviter.data:
-            return False, "Inviter email not found or inactive."
+            return False, "Existing user email not found or inactive."
 
         response = supabase.auth.sign_up({
             "email": email,
@@ -312,29 +312,23 @@ if st.session_state.user is None:
         unsafe_allow_html=True
     )
 
-    # Define menu
     menu = ["Sign Up", "Login"]
 
-    # Handle switching flag before rendering selectbox
-    if st.session_state.get("switch_to_login"):
-        st.session_state.switch_to_login = False
-        default_index = menu.index("Login")
-    else:
-        default_index = menu.index("Sign Up")
+    # --- Handle button press BEFORE selectbox is drawn ---
+    if "menu_choice" not in st.session_state:
+        st.session_state.menu_choice = "Sign Up"
 
-    # Sidebar menu with default index depending on flag
-    choice = st.sidebar.selectbox("Menu", menu, index=default_index, key="menu_choice")
+    if st.session_state.menu_choice == "Sign Up":
+        if st.button("Log in (for existing users)", key="switch_to_login_button"):
+            st.session_state.menu_choice = "Login"
+            st.rerun()
 
+    # --- Sidebar selectbox, value comes from session_state ---
+    choice = st.sidebar.selectbox("Menu", menu, key="menu_choice")
+
+    # --- Sign Up page ---
     if choice == "Sign Up":
-        
-
-        # Inline message with login link
-        if st.button("Log in (for existing users)", key="link_button"):
-            st.session_state.switch_to_login = True
-            st.rerun()        
-
         st.subheader("Create an account")
-
         st.write("Requires an existing user to accept your application")
 
         # Compute whether the beta is full
@@ -530,7 +524,7 @@ else:
         bedrooms = st.number_input("Number of bedrooms", min_value=1, step=1)
         street_name = st.text_input("Street name")
         location = st.selectbox("Neighborhood", ams_neighbourhood_options)
-        cost = st.number_input("Cost (€)", min_value=0)
+        cost = st.number_input("Total Cost (€)", min_value=0)
         start_date = st.date_input("Start Date")
         end_date = st.date_input("End Date")
         photo_link = st.text_input("Photo Link (Google Drive / Dropbox)")
