@@ -26,15 +26,20 @@ hide_streamlit_style = """
     /* Hide the classic footer */
     footer {visibility: hidden;}
 
-    /* Hide bottom toolbar / credits (works for Fork) */
+    /* Hide bottom toolbar / credits (Fork etc.) */
     div[class*="stToolbar"] {visibility: hidden !important;}
     div[class*="stDecoration"] {visibility: hidden !important;}
     div[class*="viewerBadge"] {visibility: hidden !important;}
 
-    /* Hide any bottom links pointing to Streamlit/GitHub */
+    /* Hide any Streamlit/GitHub links */
     a[href*="streamlit.io"] {display: none !important;}
     a[href*="share.streamlit.io"] {display: none !important;}
     a[href*="github.com"] {display: none !important;}
+
+    /* Hide entire containers that include those links */
+    div:has(a[href*="streamlit.io"]) {display: none !important;}
+    div:has(a[href*="share.streamlit.io"]) {display: none !important;}
+    div:has(a[href*="github.com"]) {display: none !important;}
     </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
