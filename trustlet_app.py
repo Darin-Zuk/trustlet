@@ -668,9 +668,9 @@ st.markdown("---")
 st.markdown(
     "<p style='text-align:left; color:#555; font-size:0.9em;'>"
     "💬 For any issues, email <a href='mailto:admin@amstrustlet.app'>admin@amstrustlet.app</a><br>"
-    "⚠️ Trustlet is in beta. By using this service you agree to our "
-    "<a href='/Terms' target='_self'>Terms & Conditions</a> and "
-    "<a href='/Privacy' target='_self'>Privacy Policy</a>.<br>"
+    "⚠️ By using this service you agree to our "
+    "<a href='https://docs.google.com/document/d/1F2NiYSkR0sLztiGncMTueVFr5WYe9WVmDh8VOW1WBes' target='_blank'>Terms & Conditions</a> and "
+    "<a href='https://docs.google.com/document/d/1FYmk2aHi6C91kj_tzToyyS8NYI5kA9GbaLjfLn__JMU' target='_blank'>Privacy Policy</a>."
     "</p>",
     unsafe_allow_html=True
 )
