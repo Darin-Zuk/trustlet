@@ -23,13 +23,17 @@ hide_streamlit_style = """
     /* Hide Streamlit hamburger menu */
     #MainMenu {visibility: hidden;}
 
-    /* Hide classic footer */
+    /* Hide the classic footer */
     footer {visibility: hidden;}
 
-    /* Hide Streamlit bottom toolbar (Made with Streamlit / GitHub links) */
-    div[data-testid="stStatusWidget"] {visibility: hidden;}
-    div[data-testid="stDecoration"] {visibility: hidden;}
-    div[data-testid="stToolbar"] {visibility: hidden;}
+    /* Hide bottom toolbar / credits */
+    div[class*="stToolbar"] {visibility: hidden !important;}
+    div[class*="stDecoration"] {visibility: hidden !important;}
+    div[class*="viewerBadge"] {visibility: hidden !important;}
+
+    /* Extra catch-all: hide any link pointing to Streamlit or GitHub */
+    a[href*="streamlit.io"] {display: none !important;}
+    a[href*="github.com"] {display: none !important;}
     </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
