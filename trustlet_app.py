@@ -6,10 +6,35 @@ import resend
 import traceback
 import html
 import requests
+import streamlit.components.v1 as components
+
+
+
+
 # ----------------------------------
 # Page setup
 # ----------------------------------
 st.set_page_config(page_title="Trustlet", layout="wide")
+
+
+# Hide Streamlit footer and "Fork/GitHub" badge
+hide_streamlit_badge = """
+    <style>
+    /* Hide Streamlit hamburger menu + footer */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+
+    /* Hide Fork/GitHub badges */
+    div[class*="viewerBadge"] {display: none !important;}
+    div[class*="stToolbar"] {display: none !important;}
+    div[class*="stDecoration"] {display: none !important;}
+
+    /* 🚨 Kill the Streamlit mobile hosting badge (iframe at bottom) */
+    iframe[title="streamlit-badge"] {display: none !important;}
+    iframe[src*="streamlit"] {display: none !important;}
+    </style>
+"""
+st.markdown(hide_streamlit_badge, unsafe_allow_html=True)
 
 # ----------------------------------
 # Supabase setup
@@ -30,52 +55,63 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 if "user" not in st.session_state:
     st.session_state.user = None
 
+
+APP_URL = "https://trustlet.streamlit.app"
+BETA_MAX_USERS = 50
 # ----------------------------------
 # Helpers
 # ----------------------------------
-def signup(name: str, email: str, password: str, inviter_email: str):
-    """
-    Invite-only signup:
-    - Verifies inviter exists and is_active
-    - Creates Auth user (fails cleanly if email already exists in Auth)
-    - Inserts users row (inactive), with invited_by set
-    - Sends a message of type 'invite_request' to inviter
-    """
-    # 1) Check inviter exists and is active
-    inviter = supabase.table("users").select("*") \
-        .eq("email", inviter_email).eq("is_active", True).execute()
-    if not inviter.data:
-        return False, "Inviter email not found or inactive."
-    inviter_id = inviter.data[0]["id"]
+def signup(name, email, password, inviter_email):
+    if not name or not email or not password or not inviter_email:
+        return False, "All fields (Name, Email, Password, Existing User Email) are required."
 
-    # 2) Create Auth user
-    resp = supabase.auth.sign_up({"email": email, "password": password})
-    if not resp.user:
-        return False, "This email is already registered. Please log in instead."
+    try:
+        inviter = supabase.table("users").select("*").eq("email", inviter_email).eq("is_active", True).execute()
+        if not inviter.data:
+            return False, "Existing user email not found or inactive."
 
-    auth_user_id = resp.user.get("id") if isinstance(resp.user, dict) else getattr(resp.user, "id", None)
-    if not auth_user_id:
-        return False, "Signup failed: no auth user id returned."
+        response = supabase.auth.sign_up({
+            "email": email,
+            "password": password,
+            "options": {
+                "email_redirect_to": "https://trustlet-verify.streamlit.app"
+            }
+        })
 
-    # 3) Insert/Upsert app user (inactive until approved)
-    supabase.table("users").upsert({
-        "id": auth_user_id,
-        "name": name,
-        "email": email,
-        "invited_by": inviter_id,
-        "is_active": False
-    }, on_conflict="id").execute()
+        # Normalize user ID (same as login)
+        auth_user_id = response.user.get("id") if isinstance(response.user, dict) else getattr(response.user, "id", None)
+        if not auth_user_id:
+            return False, "Signup failed: could not retrieve user ID (account may already exist)."
 
-    # 4) Create invite request message to inviter
-    create_message(
-        sender_id=response.user.id,
-        receiver_id=inviter.data[0]["id"],
-        content=f"{name} ({email}) has requested to join Trustlet.",
-        message_type="invite_request",
-        status="pending"
-    )
+        # Check for duplicate email error
+        if hasattr(response, "error") and response.error:
+            if "already registered" in str(response.error).lower():
+                return False, "This email is already registered. Please log in instead."
+            return False, f"Signup failed: {response.error}"
 
-    return True, "Signup successful! Check your inbox for an email from SupaBase Auth. You will receive another email when the nominated Existing User accepts your application."
+        # Insert into users
+        supabase.table("users").insert({
+            "id": auth_user_id,
+            "name": name,
+            "email": email,
+            "invited_by": inviter.data[0]["id"],
+            "is_active": False
+        }).execute()
+
+        # Create invite request message
+        create_message(
+            sender_id=auth_user_id,
+            receiver_id=inviter.data[0]["id"],
+            content=f"{name} ({email}) has requested to join Trustlet. Check your inbox in the app to approve.",
+            message_type="invite_request",
+            status="pending"   # <-- FIXi dont 
+        )
+
+        return True, "Signup successful! Check your inbox for an email from SupaBase Auth. You will receive another email when the nominated Existing User accepts your application."
+
+    except Exception as e:
+        return False, f"An error occurred during signup: {str(e)}"
+
 
 def login(email: str, password: str):
     """
@@ -102,8 +138,8 @@ def login(email: str, password: str):
 def send_email(to_email: str, subject: str, body: str):
     try:
         payload = {
-            "from": st.secrets["resend"]["from_email"],
-            "to": to_email,
+            "from": f"Trustlet Team <{st.secrets['resend']['from_email']}>",
+            "to": [to_email],
             "subject": subject,
             "html": body
         }
@@ -114,51 +150,153 @@ def send_email(to_email: str, subject: str, body: str):
         st.error(f"Email failed: {e}")
         st.text(traceback.format_exc())
 
-def send_email_debug(to_email, subject, body):
-    payload = {
-        "from": st.secrets["resend"]["from_email"],
-        "to": [to_email],
-        "subject": subject,
-        "html": body
-    }
-    headers = {
-        "Authorization": f"Bearer {st.secrets['resend']['api_key']}",
-        "Content-Type": "application/json"
-    }
-    resp = requests.post("https://api.resend.com/emails", json=payload, headers=headers)
-    st.write("Raw API response:", resp.status_code, resp.text)
 
-def create_message(sender_id, receiver_id, content,
-                   message_type="normal", listing_id=None,
-                   status="sent", parent_message_id=None):
-    # Build message dict
-    msg = {
-        "sender_id": sender_id,
-        "receiver_id": receiver_id,
-        "content": content,
-        "message_type": message_type,
-        "status": status,
-        "is_active": True
-    }
-    if listing_id:
-        msg["listing_id"] = listing_id
-    if parent_message_id:
-        msg["parent_message_id"] = parent_message_id  # ✅ include here
 
-    # Insert into DB
-    supabase.table("messages").insert(msg).execute()
-
-    # Send email to recipient (only if found)
-    recipient = supabase.table("users").select("email").eq("id", receiver_id).execute()
-    if recipient.data:
-        import html
-        safe_content = html.escape(content).replace("\n", "<br>")
-        send_email(
-        #send_email_debug(
-            to_email=recipient.data[0]["email"],
-            subject=f"New Trustlet {message_type} message",
-            body=f"<p>You have a new message:</p><p>{safe_content}</p>"
+def build_email(message_type, context=None, content=""):
+    if message_type == "invite_request":
+        return (
+            "New membership request on Trustlet",
+            f"<p>{content}</p>"
+            f"<p>Log into "
+            f"<a href='{APP_URL}'>Trustlet</a> and select <b>Messages</b> from the dropdown menu.</p>"
         )
+    elif message_type == "inquiry":
+        sender_name = context.get("sender_name", "A Trustlet member")
+        listing_title = context.get("listing_title", "your listing")
+
+        return (
+            f"New inquiry about your listing '{listing_title}'",
+            f"""
+            <h3>📩 New Inquiry</h3>
+            <p><strong>From:</strong> {sender_name}</p>
+            
+            <p><em>{content}</em></p>
+
+            <hr>
+            <p>To reply or view details, go to your 
+            <a href="{APP_URL}">Trustlet inbox</a>.</p>
+            """
+        )
+
+    elif message_type == "reply":
+        sender_name = context.get("sender_name", "A Trustlet member")
+
+        return (
+            "You received a reply on Trustlet",
+            f"""
+            <h3>💬 New Reply</h3>
+            <p><strong>From:</strong> {sender_name}</p>
+
+            <p><em>{content}</em></p>
+
+
+            <hr>
+            <p>To reply or view the full conversation, go to your 
+            <a href="{APP_URL}">Trustlet inbox</a>.</p>
+            """
+        )
+        
+    elif message_type == "system":
+        return (
+            "Trustlet notification",
+            f"<p>{content}</p>"
+            f"<p>You can view this update in your "
+            f"<a href='{APP_URL}'>Trustlet inbox</a>.</p>"
+        )
+    else:
+        return (
+            "New message in Trustlet inbox",
+            f"<p>{content}</p>"
+            f"<p>Check your <a href='{APP_URL}'>Trustlet inbox</a> for details.</p>"
+        )
+
+
+
+
+
+def create_message(
+    sender_id,
+    receiver_id,
+    content,
+    message_type="uncategorized",
+    status="sent",
+    context=None,
+    email_subject=None,
+    email_body=None,
+    listing_id=None
+):
+    """
+    Create a message in the database and send an email notification.
+
+    - Inserts the message into `messages`
+    - Builds email subject/body via build_email
+
+    """
+    if context is None:
+        context = {}
+
+    try:
+        # Insert into database
+        msg = (
+            supabase.table("messages")
+            .insert(
+                {
+                    "sender_id": sender_id,
+                    "receiver_id": receiver_id,
+                    "content": content,
+                    "message_type": message_type,
+                    "status": status,
+                    "listing_id": listing_id,
+                }
+            )
+            .execute()
+        )
+        if not msg.data:
+            st.error("❌ Failed to create message in database.")
+            return None
+
+        # Lookup receiver email
+        receiver = (
+            supabase.table("users")
+            .select("email, name")
+            .eq("id", receiver_id)
+            .execute()
+        )
+        if not receiver.data:
+            st.warning("⚠️ Receiver not found in users table.")
+            return msg.data[0]
+
+        to_email = receiver.data[0]["email"]
+
+
+
+        # Always include sender name in context
+        sender = (
+            supabase.table("users")
+            .select("name")
+            .eq("id", sender_id)
+            .execute()
+        )
+        if sender.data:
+            context["sender_name"] = sender.data[0]["name"]
+
+        # Build email subject + body
+        subject, body = build_email(message_type, context, content)
+
+        # Allow overrides
+        subject = email_subject or subject
+        body = email_body or body
+
+        # Send email
+        send_email(to_email, subject, body)
+
+        return msg.data[0]
+
+    except Exception as e:
+        st.error(f"❌ Error creating message: {str(e)}")
+        return None
+
+
 
 ams_neighbourhood_options = ["Oost", "ZuidOost", "Centrum", "Westerpark", "Oud-West", "Oud-Zuid", "Noord"]
 # ----------------------------------
@@ -167,41 +305,88 @@ ams_neighbourhood_options = ["Oost", "ZuidOost", "Centrum", "Westerpark", "Oud-W
 
 # ---------- Login / Signup ----------
 if st.session_state.user is None:
-    st.write('Welcome to Trustlet, the app for trusted lets.')
+    st.subheader('Welcome to Trustlet, the app for trusted lets.')
 
     st.markdown(
-        "[👉 More Info](https://docs.google.com/document/d/1M4ftORvdUBx-xdMUpaCEBxdBLGTBWj7VDNk9jtv0LQg/edit?tab=t.0)",
+        "[👉 What is Trustlet?](https://docs.google.com/document/d/1M4ftORvdUBx-xdMUpaCEBxdBLGTBWj7VDNk9jtv0LQg/edit?tab=t.0)",
         unsafe_allow_html=True
     )
 
-    menu = ["Login", "Sign Up"]
-    choice = st.sidebar.selectbox("Menu", menu)
+    menu = ["Sign Up", "Login"]
 
+    # --- Handle button press BEFORE selectbox is drawn ---
+    if "menu_choice" not in st.session_state:
+        st.session_state.menu_choice = "Sign Up"
+
+    if st.session_state.menu_choice == "Sign Up":
+        if st.button("Log in (for existing users)", key="switch_to_login_button"):
+            st.session_state.menu_choice = "Login"
+            st.rerun()
+
+    # --- Sidebar selectbox, value comes from session_state ---
+    choice = st.sidebar.selectbox("Menu", menu, key="menu_choice")
+
+    # --- Sign Up page ---
     if choice == "Sign Up":
         st.subheader("Create an account")
-        st.write('Requires an existing user to accept your application')
+        st.write("Requires an existing user to accept your application")
+
+        # Compute whether the beta is full
+        beta_resp = supabase.table("users").select("id", count="exact").execute()
+        beta_count = getattr(beta_resp, "count", None)
+        if beta_count is None:
+            beta_count = len(beta_resp.data or [])
+        is_full = beta_count >= BETA_MAX_USERS
+
         name = st.text_input("Name")
         email = st.text_input("Email")
         password = st.text_input("Password", type="password")
         inviter_email = st.text_input("Existing User Email")
-        if st.button("Sign Up"):
-            success, msg = signup(name, email, password, inviter_email)
+
+        if is_full:
+            st.warning(f"🚧 Beta limit reached ({beta_count}/{BETA_MAX_USERS}). Sign-ups are temporarily closed.")
+        # Disable the button if full
+        if st.button("Sign Up", disabled=is_full):
+            with st.spinner("⏳ Signing you up... please wait"):
+                success, msg = signup(name, email, password, inviter_email)
             if success:
                 st.success(msg)
             else:
                 st.error(msg)
+
 
     elif choice == "Login":
         st.subheader("Login")
         email = st.text_input("Email")
         password = st.text_input("Password", type="password")
         if st.button("Login"):
-            user = login(email, password)
-            if user:
-                st.session_state.user = user
-                st.rerun()
+            if not email or not password:
+                st.error("⚠️ Please enter both email and password.")
             else:
-                st.error("Login failed or account inactive")
+                try:
+                    response = supabase.auth.sign_in_with_password({
+                        "email": email,
+                        "password": password
+                    })
+
+                    if not response.user:
+                        st.error("❌ Invalid email or password.")
+                    else:
+                        auth_user_id = response.user.get("id") if isinstance(response.user, dict) else getattr(response.user, "id", None)
+                        if not auth_user_id:
+                            st.error("❌ Could not retrieve user ID.")
+                        else:
+                            user_row = supabase.table("users").select("*").eq("id", auth_user_id).execute()
+                            if not user_row.data:
+                                st.error("❌ User not found in Trustlet database.")
+                            elif not user_row.data[0].get("is_active"):
+                                st.warning("⏳ Your account exists but has not yet been activated by an inviter.")
+                            else:
+                                st.session_state.user = user_row.data[0]
+                                st.success("✅ Logged in successfully!")
+                                st.rerun()
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
 
 # ---------- Logged-in UI ----------
 else:
@@ -258,12 +443,16 @@ else:
             # show listings that start before the desired_end
             query = query.lte("start_date", desired_end.isoformat())
 
-        listings = query.order("start_date", desc=True).execute()
+        listings = query.order("start_date", desc=False).execute()
 
         # ---- Results ----
-        if not listings.data:
+        count = len(listings.data or [])
+
+        if count == 0:
             st.info("No listings match your filters.")
         else:
+            st.success(f"{count} listing{'s' if count > 1 else ''} available")
+
             for listing in listings.data or []:
                 # Fetch lister info
                 lister = supabase.table("users").select("name, created_at, invited_by").eq("id", listing["user_id"]).execute()
@@ -279,8 +468,24 @@ else:
 
                 st.write(f"🏠 {listing.get('home_type','')} — {listing.get('bedrooms', 1)} bedroom(s)")
                 st.write(f"Location: {listing.get('street_name','')}, {listing['location']}")
-                st.write(f"Cost: €{listing['cost']}")
-                st.write(f"Available: {listing['start_date']} → {listing['end_date']}")
+
+
+                # Parse dates (assuming they are in "YYYY-MM-DD" format)
+                start = datetime.strptime(listing["start_date"], "%Y-%m-%d").date()
+                end = datetime.strptime(listing["end_date"], "%Y-%m-%d").date()
+
+                nights = (end - start).days
+                total_cost = listing["cost"]
+                per_night = total_cost / nights if nights > 0 else total_cost
+
+                st.write(f"Cost: €{total_cost} (€{per_night:.2f} per night)")
+
+
+                #date format to dd/mm for listings
+                start_fmt = datetime.strptime(listing['start_date'], "%Y-%m-%d").strftime("%d/%m/%y")
+                end_fmt = datetime.strptime(listing['end_date'], "%Y-%m-%d").strftime("%d/%m/%y")
+
+                st.write(f"Available: {start_fmt} → {end_fmt}")
                 if listing.get("photo_link"):
                     st.write(f"Photos: {listing['photo_link']}")
 
@@ -302,7 +507,7 @@ else:
                             receiver_id=listing['user_id'],
                             listing_id=listing['id'],
                             content=f"Inquiry about '{listing['title']}'\n\n{message_text}",
-                            message_type="normal"
+                            message_type="inquiry"
                         )
                         st.success("Message sent!")
 
@@ -319,7 +524,7 @@ else:
         bedrooms = st.number_input("Number of bedrooms", min_value=1, step=1)
         street_name = st.text_input("Street name")
         location = st.selectbox("Neighborhood", ams_neighbourhood_options)
-        cost = st.number_input("Cost (€)", min_value=0)
+        cost = st.number_input("Total Cost (€)", min_value=0)
         start_date = st.date_input("Start Date")
         end_date = st.date_input("End Date")
         photo_link = st.text_input("Photo Link (Google Drive / Dropbox)")
@@ -377,7 +582,7 @@ else:
         # Only fetch active messages; handled invite requests will be hidden by status != 'pending'
         inbox = supabase.table("messages").select("*") \
             .eq("receiver_id", user['id']).eq("is_active", True) \
-            .order("sent_at", desc=True).execute()
+            .order("created_at", desc=True).execute()
 
         for msg in inbox.data or []:
             # Sender info
@@ -408,7 +613,14 @@ else:
                             receiver_id=msg["sender_id"],
                             content="✅ Your membership request has been approved. Welcome to Trustlet!",
                             message_type="system",
-                            status="sent"
+                            status="sent",
+                            email_subject="🎉 Welcome to Trustlet – Your membership has been approved!",
+                            email_body=f"""
+                                <p>Hi there,</p>
+                                <p>Good news – your membership request has been <strong>approved</strong> 🎉</p>
+                                <p>You can now <a href="https://trustlet.streamlit.app">log in to Trustlet</a>.</p>
+                                <p>The Trustlet Team</p>
+                            """
                         )
                         st.success(f"Approved {sender_email}")
                         st.rerun()
@@ -451,7 +663,6 @@ else:
                             listing_id=msg.get("listing_id"),
                             content=reply_text,
                             message_type="reply",
-                            parent_message_id=msg["id"]
                         )
                         st.success("Reply sent")
                         st.rerun()
@@ -462,3 +673,17 @@ else:
                         st.rerun()
 
             st.markdown("---")
+
+#st.markdown("---")
+st.markdown("---")
+
+st.markdown(
+    "<p style='text-align:left; color:#555; font-size:0.9em;'>"
+    "💬 For any issues, email <a href='mailto:admin@amstrustlet.app'>admin@amstrustlet.app</a><br>"
+    "⚠️ By using this service you agree to our "
+    "<a href='https://docs.google.com/document/d/1F2NiYSkR0sLztiGncMTueVFr5WYe9WVmDh8VOW1WBes' target='_blank'>Terms & Conditions</a> and "
+    "<a href='https://docs.google.com/document/d/1FYmk2aHi6C91kj_tzToyyS8NYI5kA9GbaLjfLn__JMU' target='_blank'>Privacy Policy</a>."
+    "</p>",
+    unsafe_allow_html=True
+)
+
