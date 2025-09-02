@@ -237,15 +237,6 @@ def create_message(
 
     try:
 
-        st.write("DEBUG: about to insert message row", {
-            "sender_id": sender_id,
-            "receiver_id": receiver_id,
-            "content": content,
-            "message_type": message_type,
-            "status": status,
-            "listing_id": listing_id,
-        })
-
 
         # Insert into database
         msg = (
