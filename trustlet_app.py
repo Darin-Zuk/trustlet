@@ -236,6 +236,8 @@ def create_message(
         context = {}
 
     try:
+
+
         # Insert into database
         msg = (
             supabase.table("messages")
