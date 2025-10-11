@@ -648,11 +648,7 @@ else:
             st.success("Listing added!")
 
     if res.data:
-        notify_matching_alerts_for_listing(res.data[0])
-
-
-            if res.data:
-                notify_matching_alerts_for_listing(res.data[0])            
+        notify_matching_alerts_for_listing(res.data[0])    
 
         st.markdown("---")
         st.subheader("Your listings (activate/deactivate)")
