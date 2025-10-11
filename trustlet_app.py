@@ -328,7 +328,7 @@ def create_alert(user_id, title, filters, is_active=True):
         "user_id": user_id,
         "title": (title or "").strip() or "Listing alert",
         "filters": filters,
-        "is_active": is_active,
+        "is_active": True,   # always true; not exposed in UI
     }).execute()
 
 def fetch_user_alerts(user_id):
@@ -511,33 +511,20 @@ else:
                 f"- Max cost: **{f_payload.get('max_cost') or 'Any'}**  \n"
                 f"- Dates: **{f_payload.get('desired_start') or 'Any'} → {f_payload.get('desired_end') or 'Any'}**"
             )
+
+            # inside the Create listing alert modal (Browse Listings)
             alert_title = st.text_input("Alert name", value="My listing alert")
-            active = st.checkbox("Active", value=True)
 
             col_ok, col_cancel = st.columns(2)
             with col_ok:
                 if st.button("Create alert"):
-                    create_alert(user['id'], alert_title, f_payload, active)
+                    create_alert(user['id'], alert_title, f_payload)  # always active
                     st.success("Alert created")
                     st.session_state.show_alert_modal = False
             with col_cancel:
                 if st.button("Cancel"):
                     st.session_state.show_alert_modal = False
 
-        st.markdown("#### Manage alerts")
-        ua = fetch_user_alerts(user['id'])
-        for a in ua.data or []:
-            c1, c2, c3 = st.columns([6,2,2])
-            with c1:
-                st.write(f"**{a.get('title','Listing alert')}** — {('Active' if a['is_active'] else 'Paused')}")
-            with c2:
-                if st.button(("Pause" if a['is_active'] else "Resume"), key=f"toggle_alert_{a['id']}"):
-                    supabase.table("alerts").update({"is_active": not a["is_active"]}).eq("id", a["id"]).execute()
-                    st.rerun()
-            with c3:
-                if st.button("Delete", key=f"delete_alert_{a['id']}"):
-                    supabase.table("alerts").delete().eq("id", a["id"]).execute()
-                    st.rerun()
 
 
         # Apply filters
@@ -643,8 +630,9 @@ else:
         end_date = st.date_input("End Date")
         photo_link = st.text_input("Photo Link (Google Drive / Dropbox)")
 
+        # Add/Remove Listings → Submit Listing handler
         if st.button("Submit Listing"):
-            supabase.table("listings").insert({
+            res = supabase.table("listings").insert({
                 "user_id": user['id'],
                 "title": (title or "").strip() or "Untitled listing",
                 "home_type": home_type,
@@ -652,12 +640,16 @@ else:
                 "location": location,
                 "street_name": street_name,
                 "cost": cost,
-                "start_date": start_date.isoformat(),  # fix: date -> string
-                "end_date": end_date.isoformat(),      # fix: date -> string
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
                 "photo_link": photo_link,
                 "is_active": True
             }).execute()
             st.success("Listing added!")
+
+    if res.data:
+        notify_matching_alerts_for_listing(res.data[0])
+
 
             if res.data:
                 notify_matching_alerts_for_listing(res.data[0])            
@@ -692,7 +684,7 @@ else:
                             st.success("Listing activated")
                             st.rerun()
 
-    # ------------------- Messages (includes approvals) -------------------
+        # ------------------- Messages (includes approvals) -------------------
     elif action == "Messages":
         st.subheader("Inbox")
 
@@ -744,7 +736,7 @@ else:
 
                 with c2:
                     if st.button(f"Reject {sender_email}", key=f"reject_{msg['id']}"):
-                        # Optional: delete the user entirely on rejection
+                        # Optional: deactivate user on rejection
                         supabase.table("users").update({"is_active": False}).eq("id", msg["sender_id"]).execute()
                         supabase.table("messages").update({"status": "rejected"}).eq("id", msg["id"]).execute()
                         st.info(f"Rejected {sender_email}")
@@ -757,7 +749,7 @@ else:
                         st.success("Removed from inbox")
                         st.rerun()
 
-            # NORMAL MESSAGE (or any non-invite message)
+            # NORMAL MESSAGE (inquiries, replies, alerts, etc.)
             else:
                 # Show listing title context if present
                 title_line = ""
@@ -790,6 +782,33 @@ else:
                         st.rerun()
 
             st.markdown("---")
+
+        # --- Manage Alerts at the bottom ---
+        st.subheader("Manage alerts")
+
+        def _summarize_filters(f):
+            parts = []
+            if f.get("home_type"): parts.append(f"Home: {f['home_type']}")
+            if f.get("suburbs"):   parts.append("Areas: " + ", ".join(f['suburbs']))
+            if f.get("max_cost"):  parts.append(f"Max €{f['max_cost']}")
+            ds, de = f.get("desired_start"), f.get("desired_end")
+            if ds or de: parts.append(f"Dates: {ds or 'Any'} → {de or 'Any'}")
+            return " · ".join(parts) or "Any listing"
+
+        ua = fetch_user_alerts(user['id'])
+        if not ua.data:
+            st.caption("You have no alerts yet. Create one from **Browse Listings → Create listing alert**.")
+        else:
+            for a in ua.data:
+                cols = st.columns([8, 2])
+                with cols[0]:
+                    st.write(f"**{a.get('title','Listing alert')}**")
+                    st.caption(_summarize_filters(a.get('filters', {})))
+                with cols[1]:
+                    if st.button("Delete", key=f"del_alert_{a['id']}"):
+                        supabase.table("alerts").delete().eq("id", a["id"]).execute()
+                        st.rerun()
+
 
 #st.markdown("---")
 st.markdown("---")
